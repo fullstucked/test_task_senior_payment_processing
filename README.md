@@ -257,21 +257,22 @@ GET /v1/payments/{payment_id}
 ```
 git clone  https://github.com/fullstucked/test_task_senior_payment_processing
 cd test_task_senior_payment_processing
+mv .env.example .env
 ```
-**Rename .env.example to .env and redact content**
+**Rename .env.example to .env and edit content**
 
 ### via Docker:
 **Setup**:
 ```
-docker compose \
-  --env-file .env \                                                                                                                                                                                              --env-file .env.development.local \
+docker-compose \
   -f infra/docker/docker-compose.yml \
+    --env-file .env \
   build
 ```
 
 **Run**
 ```
-docker compose \
+docker-compose \
   --env-file .env \
   -f infra/docker/docker-compose.yml \
   up
