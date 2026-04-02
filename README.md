@@ -255,8 +255,8 @@ GET /v1/payments/{payment_id}
 ## Setup & Run:
 **Clone**
 ```
-git clone  []
-cd payments_test_task
+git clone  https://github.com/fullstucked/test_task_senior_payment_processing
+cd test_task_senior_payment_processing
 ```
 **Rename .env.example to .env and redact content**
 
