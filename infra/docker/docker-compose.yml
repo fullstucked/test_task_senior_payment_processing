@@ -1,0 +1,91 @@
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pg_volume:
+    driver: local
+  pgadmin_volume:
+    driver: local
+
+services:
+  postgres:
+    container_name: payments_db
+    image: postgres:15
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      POSTGRES_USER : ${DB_USER}
+      POSTGRES_PASSWORD : ${DB_PASSWORD}
+      POSTGRES_DB : ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - pg_volume:/var/lib/postgresql/data #:rw
+    command: [ "postgres"] #, "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_statement=none", "-c", "log_min_duration_statement=1000", "-c", "log_connections=on", "-c", "log_disconnections=on" ]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 120s
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: payments_rabbitmq
+    env_file:
+      - ../../.env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${BROKER_USER}
+      RABBITMQ_DEFAULT_PASS: ${BROKER_PASS}
+    ports:
+      - "${BROKER_PORT}:${BROKER_CONTAINER_PORT}"  # e.g., 5672:5672
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: payment_processing_api:local
+    container_name: payment_processing_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+        - ../../.env
+    environment:
+      DATABASE_URL: ${DB_TYPE}://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      BROKER_URL:
+      API_KEY: ${API_KEY}
+    ports:
+      - "${API_PORT}:${API_CONTAINER_PORT}"
+    networks:
+      - app-network
+
+
+  consumer:
+    image: payment_processing_api:local
+    container_name: consumer
+    env_file:
+        - ../../.env
+    environment:
+      DATABASE_URL: ${DB_TYPE}://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: ["sh", "-c", "uv run ./src/payment_service/consumer.py"] 
+    networks:
+      - app-network
+    restart: unless-stopped
