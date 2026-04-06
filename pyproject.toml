@@ -16,6 +16,7 @@ dependencies = [
     "structlog>=25.5.0",
     "uvicorn>=0.42.0",
     "uvloop>=0.22.1",
+    "validators>=0.35.0",
 ]
 
 [tool.pyrefly]

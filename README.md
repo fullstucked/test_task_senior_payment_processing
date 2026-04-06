@@ -1,3 +1,4 @@
+discuss removing paymentID in favor of Idempotency Key
 # Async Payment Processing Service
 
 <!--toc:start-->
@@ -31,9 +32,25 @@ This service consists from:
 - **Idempotency Support:** Prevent duplicate payments.  
 
 **Next steps**
-- add task hanlded timing in outbox and fetch task which processed more than timeout/mark them as pending
-- discuss an option to avoid publish from api and just fetch by consumer more frequent
+- add task hanlded timing in outbox and fetch task which processed more than timeout/mark them as pending or in case broker-failiure when task status was locked to processed
+- add infa-error handling
 - logger via structlog
+
+1. Observability & Metrics
+Prometheus + Grafana: Collect metrics on API, DB, and RabbitMQ.
+Metrics to track: request rate, error rate, latency, payment processing duration, webhook success/failures.
+Distributed tracing: OpenTelemetry to trace requests across API → consumer → RabbitMQ → DB.
+2. Logging & Alerting
+Structured logs with JSON format.
+Centralized log aggregator: ELK stack (Elasticsearch, Logstash, Kibana) or Loki + Grafana.
+Alerts for: failed payments, DB connection issues, RabbitMQ backlog, consumer crashes.
+3. CI/CD & Quality Gates
+GitHub Actions / GitLab CI: Run tests, linters, and code coverage automatically on each PR.
+Quality checks:
+pytest coverage reports
+4. Health Checks & Readiness Probes
+Kubernetes-style liveness and readiness probes for API and consumers.
+Helps orchestrators restart unhealthy services automatically.
 
 ---
 
@@ -59,32 +76,46 @@ This service consists from:
     │   │   ├── dto
     │   │   │   ├── create.py
     │   │   │   └── read.py
-    │   │   ├── use_cases
-    │   │   │   ├── events
-    │   │   │   │   ├── fetch_pendings.py
-    │   │   │   │   ├── process_payment.py
-    │   │   │   │   └── send_notification.py
-    │   │   │   ├── create_payment.py
-    │   │   │   └── get_payment_by_id.py
-    │   │   ├── errors.py
-    │   │   ├── event_bus.py
-    │   │   └── uow.py
+    │   │   ├── interfaces
+    │   │   │   ├── event_bus.py
+    │   │   │   ├── uow.py
+    │   │   │   └── webhook_sender.py
+    │   │   └── use_cases
+    │   │       ├── events
+    │   │       │   ├── process_payment.py
+    │   │       │   └── send_notification.py
+    │   │       ├── create_payment.py
+    │   │       ├── fetch_pendings.py
+    │   │       └── get_payment_by_id.py
     │   └── shared
+    │       ├── interfaces
+    │       │   ├── event_bus.py
+    │       │   └── uow.py
+    │       ├── use_cases
+    │       │   ├── event_bus.py
+    │       │   ├── event_driven_use_case.py
+    │       │   ├── uow.py
+    │       │   └── use_case.py
+    │       ├── utils
+    │       │   └── serialize_values.py
     │       ├── dto.py
-    │       ├── errors.py
-    │       ├── event_based_use_case.py
-    │       ├── event_bus.py
-    │       ├── uow.py
-    │       └── use_case.py
+    │       └── errors.py
     ├── bootstrap
     │   ├── api
     │   │   ├── hanlers
     │   │   │   └── exceptions
-    │   │   │       └── domain
-    │   │   │           └── payment.py
+    │   │   │       ├── domain
+    │   │   │       │   ├── payment.py
+    │   │   │       │   └── shared.py
+    │   │   │       ├── infra
+    │   │   │       ├── shared
+    │   │   │       │   └── runtime.py
+    │   │   │       └── __init__.py
     │   │   ├── app_factory.py
     │   │   └── dependencies.py
     │   └── consumer
+    │       ├── utils
+    │       │   └── queue_binds.py
     │       └── app_factory.py
     ├── domain
     │   ├── payment
@@ -104,8 +135,7 @@ This service consists from:
     │   │   ├── events.py
     │   │   ├── payment.py
     │   │   ├── repository.py
-    │   │   └── service.py
-    │   └── shared
+    │   │   └── service.py                                                                                                                                                                                         │   └── shared
     │       ├── generics
     │       │   └── stringable.py
     │       ├── entity.py
@@ -116,23 +146,33 @@ This service consists from:
     │   ├── payment
     │   │   ├── db
     │   │   │   ├── repository.py
+    │   │   │   ├── sqlite_repo.py
     │   │   │   └── table.py
     │   │   ├── outbox
     │   │   │   ├── repository.py
+    │   │   │   ├── sqlite_repo.py
     │   │   │   └── table.py
     │   │   ├── publisher
+    │   │   │   ├── exchanges
+    │   │   │   │   ├── dead.py
+    │   │   │   │   └── payments.py
+    │   │   │   ├── queues
+    │   │   │   │   ├── dlq.py
+    │   │   │   │   ├── new_payment.py
+    │   │   │   │   └── payment_notify.py
     │   │   │   └── rabbit_publisher.py
+    │   │   ├── webhooks
+    │   │   │   └── httpx_sender.py
     │   │   └── uow.py
     │   └── shared
     │       ├── enums
     │       │   └── status.py
     │       ├── events
-    │       │   ├── queue
-    │       │   │   ├── dlq.py
-    │       │   │   ├── new_payment.py
-    │       │   │   └── payment_notify.py
-    │       │   ├── broker.py
-    │       │   └── exchanges.py
+    │       │   └── broker.py
+    │       ├── queues
+    │       │   └── retries.py
+    │       ├── utils
+    │       │   └── serialize_values.py
     │       └── session.py
     ├── presentation
     │   ├── ampq
@@ -170,7 +210,7 @@ This service consists from:
 - **infra:** Database, event publishing, and broker integration.  
 - **presentation:** HTTP endpoints, AMQP consumers, schemas, and routers.  
 - **setup:** App factory and entry points.  
-- **bootstrap:** AMQP queues and exchanges setup, API+Cousumer factories.  
+- **bootstrap:** AMQP queues and exchanges setup and binding, API+Cousumer factories.  
 
 ---
 
@@ -201,7 +241,7 @@ Body:
 {
 "amount": 123.45,
 "currency": "USD",
-"description": "Invoice #123",
+"description": "Invoice 123",
 "metadata": {"order_id": "ABC123"},
 "webhook_url": "https://example.com/webhook
 "
@@ -226,7 +266,7 @@ GET /v1/payments/{payment_id}
   "payment_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "amount": 123.45,
   "currency": "USD",
-  "description": "Invoice #123",
+  "description": "Invoice 123",
   "metadata": {"order_id": "ABC123"},
   "status": "PENDING",
   "key": "idempotency_key",
@@ -282,10 +322,8 @@ docker-compose \
 ## Improvements Roadmap
 
 1. **Testing**
-   - Unit tests for domain logic, events, and use cases.
+   - ~~Unit tests for domain logic, events, and use cases.~~
    - Integration tests covering DB operations, AMQP message handling, and HTTP API.
-   - End-to-End tests simulating full payment workflow, including retries and DLQ.
-   - High-load and stress tests for AMQP consumers and database under concurrent load.
 
 3. **Scaling**
    - Scale consumers horizontally to handle higher throughput with multiple worker instances.
@@ -303,5 +341,4 @@ docker-compose \
    - CI/CD pipeline for tests, linting, and builds.
    - Secrets management for API keys and DB credentials.
 
-9. **Future Enhancements**
-   - Monitoring dashboards for queue backlogs and processing latencies.
+
