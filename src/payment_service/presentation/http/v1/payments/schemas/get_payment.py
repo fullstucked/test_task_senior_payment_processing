@@ -1,4 +1,3 @@
-from application.payment.use_cases.get_payment_by_id import GetPaymentByIdDTO
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
@@ -6,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from application.payment.use_cases.get_payment_by_id import GetPaymentByIdDTO
 from domain.payment.enums.currency import Currency
 from domain.payment.enums.status import Status
 

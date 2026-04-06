@@ -1,4 +1,3 @@
-from presentation.ampq.v1.shared.schemas.base.base import EventData
 from decimal import Decimal
 from uuid import UUID
 
@@ -6,7 +5,7 @@ from pydantic import BaseModel
 
 from domain.payment.enums.status import Status
 from domain.payment.events import PaymentProcessedEvent
-from presentation.ampq.v1.shared.schemas.base.base import event
+from presentation.ampq.v1.shared.schemas.base.base import EventData, event
 
 
 @event

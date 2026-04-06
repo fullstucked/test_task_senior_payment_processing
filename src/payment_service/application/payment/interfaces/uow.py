@@ -1,4 +1,4 @@
-from application.shared.uow import AbstractUnitOfWork
+from application.shared.interfaces.uow import AbstractUnitOfWork
 from domain.payment.event_repo import PaymentEventRepository
 from domain.payment.repository import PaymentRepository
 

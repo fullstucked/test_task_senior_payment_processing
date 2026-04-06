@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from urllib.parse import urlparse
+from validators import url as url_validate
 
 from domain.payment.errors import PaymentValidationError
 from domain.shared.valueObject import ValueObject
@@ -22,13 +23,13 @@ class WebhookUrl(ValueObject):
         if parsed.scheme not in ('http', 'https'):
             raise PaymentValidationError('Webhook URL must be http or https')
 
-        # Host validation
-        if not parsed.netloc:
-            raise PaymentValidationError('Webhook URL must have a valid host')
-
         # Local network violation prevention
         if parsed.hostname in ('localhost', '127.0.0.1'):
             raise PaymentValidationError('Webhook URL cannot point to localhost')
+
+        # Complex validation ig host not startswith `-` for ex
+        if not url_validate(self.value):
+            raise PaymentValidationError('Webhook URL must be valid')
 
     @classmethod
     def rebuild(cls, value: str) -> 'WebhookUrl':  # type: ignore[override]

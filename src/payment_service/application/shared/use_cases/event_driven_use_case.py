@@ -5,6 +5,7 @@ from domain.shared.event import DomainEvent
 
 Event = TypeVar('Event', bound=DomainEvent)
 
-class EventDrivenUseCase(Generic[Event], ABC):
+
+class EventDrivenUseCase(ABC, Generic[Event]):
     async def __call__(self, event: Event) -> None:
         raise NotImplementedError

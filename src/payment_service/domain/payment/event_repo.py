@@ -1,6 +1,6 @@
-from uuid import UUID
 from abc import ABC, abstractmethod
 from typing import Iterable
+from uuid import UUID
 
 from domain.payment.events import PaymentDomainEvent
 
@@ -21,6 +21,7 @@ class PaymentEventRepository(ABC):
         Saves new Payment event
         """
         raise NotImplementedError
+
     @abstractmethod
     async def mark_done(self, event_id: UUID) -> None:
         """
@@ -31,5 +32,13 @@ class PaymentEventRepository(ABC):
     async def mark_failed(self, event_id: UUID) -> None:
         """
         Mark event as failed
+        """
+        raise NotImplementedError
+
+    async def mark_in_process(self, event_id: UUID) -> bool:
+        """
+        For interractions with external systems like notification
+        To avoid duplicates on messages for example
+        return None if already in process
         """
         raise NotImplementedError

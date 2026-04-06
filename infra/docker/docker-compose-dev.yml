@@ -14,7 +14,6 @@ services:
     image: postgres:15
     restart: unless-stopped
     env_file:
-      - ../../.env
       - ../../.env.development.local
     environment:
       POSTGRES_USER : ${DB_USER}
@@ -24,10 +23,7 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - pg_volume:/var/lib/postgresql/data #:rw
-      # for DevOps to more explict DB configuration
-      # - ../postgres/postgres.conf:/etc/postgresql/postgresql.conf:ro
-      # - ../postgres/init-scripts:/docker-entrypoint-initdb.d:ro
-    command: [ "postgres"] #, "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_statement=none", "-c", "log_min_duration_statement=1000", "-c", "log_connections=on", "-c", "log_disconnections=on" ]
+    command: [ "postgres"] 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 30s
@@ -58,7 +54,6 @@ services:
     image: rabbitmq:3-management
     container_name: payments_rabbitmq
     env_file:
-      - ../../.env
       - ../../.env.development.local
     environment:
       RABBITMQ_DEFAULT_USER: ${BROKER_USER}
@@ -86,7 +81,6 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-        - ../../.env
         - ../../.env.development.local
     environment:
       DATABASE_URL: ${DB_TYPE}://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
@@ -102,7 +96,6 @@ services:
     image: payment_processing_api:local
     container_name: consumer
     env_file:
-        - ../../.env
         - ../../.env.development.local
     environment:
       DATABASE_URL: ${DB_TYPE}://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}

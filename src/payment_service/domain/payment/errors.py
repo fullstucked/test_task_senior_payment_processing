@@ -1,9 +1,11 @@
-from domain.shared.errors import DomainError
-from domain.shared.errors import DomainValidationError
-from domain.shared.errors import DomainTypeError
-from domain.shared.errors import DomainResourceNotFoundError
-from domain.shared.errors import DomainBusinessRuleError
-from domain.shared.errors import DomainInvariantError
+from domain.shared.errors import (
+    DomainBusinessRuleError,
+    DomainError,
+    DomainInvariantError,
+    DomainResourceNotFoundError,
+    DomainTypeError,
+    DomainValidationError,
+)
 
 
 class PaymentError(DomainError): ...

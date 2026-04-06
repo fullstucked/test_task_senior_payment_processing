@@ -7,72 +7,32 @@ from domain.payment.errors import (
     PaymentInvariantError,
     PaymentResourceNotFoundError,
 )
-from domain.shared.errors import (
-    DomainBusinessRuleError,
-    DomainInvariantError,
-    DomainResourceNotFoundError,
-)
 
 
-def register_exception_handlers(app: FastAPI):
+def register_payment_domain_exception_handlers(app: FastAPI):
 
     @app.exception_handler(PaymentResourceNotFoundError)
-    async def payment_not_found_error(request: Request, exc: Exception):
+    async def payment_not_found_error(request: Request, exc: PaymentResourceNotFoundError):
         return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={
-                'error': {
-                    'type': exc.__class__.__name__,
-                    'message': str(exc),
-                }
-            },
+            status_code=status.HTTP_404_NOT_FOUND, content={'error': 'Payment not found.'}
         )
 
-    @app.exception_handler(DomainResourceNotFoundError)
-    async def generic_not_found_error(request: Request, exc: Exception):
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={
-                'error': {
-                    'type': exc.__class__.__name__,
-                    'message': str(exc),
-                }
-            },
-        )
-
-    @app.exception_handler(DomainBusinessRuleError)
     @app.exception_handler(PaymentBusinessRuleError)
-    async def business_rule_error_handler(request: Request, exc: Exception):
+    async def business_rule_error_handler(request: Request, exc: PaymentBusinessRuleError):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={'error': {'type': exc.__class__.__name__}},
+            content={'error': 'Payment cannot be processed.', 'message': str(exc)},
         )
 
     @app.exception_handler(PaymentInvariantError)
-    @app.exception_handler(DomainInvariantError)
-    async def generic_business_rule_error_handler(
-        request: Request, exc: DomainBusinessRuleError | DomainInvariantError
-    ):
+    async def invariant_error_handler(request: Request, exc: PaymentInvariantError):
         return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={'error': {'type': exc.__class__.__name__, 'message': str(exc)}},
-        )
-
-    @app.exception_handler(ValueError)
-    async def value_error_handler(request: Request, exc: ValueError):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content={'detail': 'value error'}
+            status_code=status.HTTP_400_BAD_REQUEST, content={'error': {'message': str(exc)}}
         )
 
     @app.exception_handler(PaymentError)
-    async def genreic_payment_error(request: Request, exc: Exception):
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={'Internal server error!'}
-        )
-
-    @app.exception_handler(Exception)
-    async def generic_error_handler(request: Request, exc: Exception):
+    async def generic_payment_error(request: Request, exc: PaymentError):
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={'detail': 'Internal server error'},
+            content={'error': 'Internal server error. Please try again later.'},
         )

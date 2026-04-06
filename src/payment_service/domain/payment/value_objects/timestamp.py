@@ -34,7 +34,16 @@ class Timestamp(ValueObject):
         return self.value.isoformat()
 
     @classmethod
-    def rebuild(cls, value: datetime) -> 'Timestamp':  # type: ignore[override]
+    def rebuild(cls, value: datetime | None) -> 'Timestamp':  # type: ignore[override]
+        """
+        USE CAREFULLY - EMPTY ONLY IN CASE OF processed_at
+        """
+
+        #### !!! Narrow place !!!
+        # For processed_at attribute of Payment which can be presented as None
+        ####
+        if value is None:
+            return None #type: ignore[format unmatch]
         obj = cls.__new__(cls)
         object.__setattr__(obj, 'value', value)
         return obj

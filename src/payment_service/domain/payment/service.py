@@ -11,7 +11,7 @@ from domain.payment.value_objects.webhook_url import WebhookUrl
 
 class PaymentService:
     """
-    Combine presistance with domain rules
+    Combine presistance with domain rules and events
     """
 
     def __init__(self, repo: PaymentRepository):
@@ -33,6 +33,7 @@ class PaymentService:
 
         payment_exists = await self._repo.get_by_key(key)
 
+        # or replace with same request same result logic
         if payment_exists:
             raise PaymentExistsError(message='PaymentExists')
 

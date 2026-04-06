@@ -1,10 +1,10 @@
-from bootstrap.api.dependencies import get_api_key
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from structlog import get_logger
 
-from bootstrap.api.hanlers.exceptions.domain.payment import register_exception_handlers
+from bootstrap.api.dependencies import get_api_key
+from bootstrap.api.hanlers.exceptions import register_exceptions
 from presentation.http.v1.payments.router import router
 
 
@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
         dependencies=[Depends(get_api_key)],
     )
 
-    register_exception_handlers(app)
+    register_exceptions(app)
     app.include_router(router)
 
     return app

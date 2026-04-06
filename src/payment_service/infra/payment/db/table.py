@@ -1,3 +1,4 @@
+from sqlalchemy import Index
 from sqlalchemy import JSON, TIMESTAMP, Column, Enum, Numeric, String, Table, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -18,5 +19,12 @@ payments = Table(
     Column('created_at', TIMESTAMP(timezone=True), nullable=False),
     Column('processed_at', TIMESTAMP(timezone=True)),
     Column('webhook_url', String, nullable=False),
-    UniqueConstraint('idempotency_key', name='uq_payment_idempotency'),
+    
+    Index('ix_payments_idempotency_key', 'idempotency_key'),  # Index on 'idempotency_key'
+    Index('ix_payments_payment_id', 'id'),  # Index on 'status'
+
+    UniqueConstraint('id', name='uq_payments_id'),  # Unique constraint for 'id' (primary key)
+    UniqueConstraint(
+        'idempotency_key', name='uq_payments_idempotency_key'
+    ),  # Unique constraint for 'idempotency_key'   UniqueConstraint('idempotency_key', name='uq_payment_idempotency'),
 )

@@ -3,9 +3,9 @@ from typing import override
 from uuid import UUID
 
 from application.payment.dto.read import PaymentDetailedReadDTO
-from application.payment.uow import AbstractPaymentUnitOfWork
+from application.payment.interfaces.uow import AbstractPaymentUnitOfWork
 from application.shared.dto import BaseDTO
-from application.shared.use_case import UseCaseInterface
+from application.shared.use_cases.use_case import UseCaseInterface
 from domain.payment.value_objects.id import PaymentId
 
 
@@ -28,6 +28,7 @@ class GetPaymentUseCase(UseCaseInterface[GetPaymentByIdDTO, PaymentDetailedReadD
         id = PaymentId(dto.id)
 
         async with self._uow as uow:
+            # In not found case raises `PaymentNotFoundError`
             payment = await uow.payments.get_by_id(payment_id=id)
 
             return PaymentDetailedReadDTO.from_domain(payment=payment)

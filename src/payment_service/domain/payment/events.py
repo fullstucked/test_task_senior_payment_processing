@@ -53,7 +53,7 @@ class PaymentDomainEvent(DomainEvent):
 
     @classmethod
     def __event_key__(cls) -> str:
-        return ''
+        return '*'
 
 
 @register_event

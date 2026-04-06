@@ -1,17 +1,15 @@
-from application.payment.uow import AbstractPaymentUnitOfWork
-from datetime import datetime
 from typing import override
 
-import httpx
-
-from application.shared.event_based_use_case import EventDrivenUseCase
+from application.payment.interfaces.webhook_sender import WebhookSender
+from application.shared.utils.serialize_values import _serialize_value
+from application.shared.use_cases.event_driven_use_case import EventDrivenUseCase
 from domain.payment.enums.status import Status
 from domain.payment.events import PaymentProcessedEvent
 
 
 class SendNotificationUseCase(EventDrivenUseCase[PaymentProcessedEvent]):
-    def __init__(self, uow: AbstractPaymentUnitOfWork):
-        self._uow: AbstractPaymentUnitOfWork = uow
+    def __init__(self, webhook_sender: WebhookSender):
+        self.webhook_sender = webhook_sender
 
     @override
     async def __call__(self, event: PaymentProcessedEvent, timeout=5):
@@ -29,27 +27,7 @@ class SendNotificationUseCase(EventDrivenUseCase[PaymentProcessedEvent]):
                 'amount': event.amount,
                 'currency': event.currency,
             }
-        payload_dict = {k: self._serialize_value(v) for k, v in payload.items()}
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            try:
-                resp = await client.post(event.webhook_url, json=payload_dict)
 
-                if resp.status_code < 300:
-                    return True
-                    await self._uow.outbox.mark_done(event.id)
+        payload_dict = {k: _serialize_value(v) for k, v in payload.items()}
 
-            except Exception as exc:
-                raise exc
-
-    @staticmethod
-    def _serialize_value(value: object) -> str | int | float | bool | datetime | None:
-        """Serializes value to be JSON-compatible."""
-        if isinstance(value, str):
-            return value
-        if isinstance(value, (int, float, bool)):
-            return value
-        if isinstance(value, datetime):
-            return value.isoformat()
-        if value is None:
-            return None
-        return str(value)
+        await self.webhook_sender.send(url=event.webhook_url, payload=payload_dict, timeout=timeout)

@@ -47,7 +47,9 @@ class Payment(Entity[PaymentId, PaymentDomainEvent]):
 
     def __post_init__(self):
         if self.status != Status.PENDING and self.processed_at is None:
-            raise PaymentBusinessRuleError('Cannot presists processed payment without processing mark')
+            raise PaymentBusinessRuleError(
+                'Cannot presists processed payment without processing mark'
+            )
 
     # ---------------------------------------------------------
     # Behavior

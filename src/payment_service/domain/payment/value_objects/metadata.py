@@ -1,8 +1,10 @@
+from typing import Generic
+from typing import TypeVar
+from domain.shared.generics.stringable import Stringable
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from domain.payment.errors import PaymentTypeError
-from domain.shared.generics.stringable import Stringable
 from domain.shared.valueObject import ValueObject
 
 # Ensure that obj can be represented as str
@@ -23,7 +25,6 @@ class Metadata(ValueObject, Generic[T]):
         if not isinstance(self.value, dict):
             raise PaymentTypeError('Metadata must be a dictionary')
 
-        # Ensure serialization ability for each field in dict
         if not all(isinstance(k, str) for k in self.value):
             raise PaymentTypeError('Not each field serializable')
 

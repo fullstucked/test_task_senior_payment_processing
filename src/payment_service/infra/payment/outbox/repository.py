@@ -4,33 +4,29 @@ from typing import Iterable
 from uuid import UUID
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.payment.event_repo import PaymentEventRepository
 from domain.payment.events import PaymentDomainEvent, rebuild_event
 from infra.shared.enums.status import TaskStatus
-
-from .table import outbox
+from infra.shared.utils.serialize_values import _serialize_value
+from infra.payment.outbox.table import outbox
 
 
 class SqlAlchemyOutboxRepository(PaymentEventRepository):
-    def __init__(self, session):
+    """
+    PostgreSQL implementation of outbox repository
+    to change DB replace insert postgres dialtect  with complimentary one
+    """
+
+    def __init__(self, session: AsyncSession):
         self.session = session
 
-    @staticmethod
-    def _serialize_value(value: object) -> str | int | float | bool | datetime | None:
-        """Serializes value to be JSON-compatible."""
-        if isinstance(value, str):
-            return value
-        if isinstance(value, datetime):
-            return str(value)
-        if isinstance(value, (int, float, bool)):
-            return value
-        if value is None:
-            return None
-        return str(value)
-
     async def add(self, events: Iterable[PaymentDomainEvent]) -> None:
-
+        """
+        Writes domain event to db
+        """
         for event in events:
             event_dict: dict[str, object] = asdict(event)
             event_data = {
@@ -39,9 +35,9 @@ class SqlAlchemyOutboxRepository(PaymentEventRepository):
                 'id': event.id,
                 'occured_at': event.occured_at,
                 'payload': {
-                    k: self._serialize_value(v)
+                    k: _serialize_value(v)
                     for k, v in event_dict.items()
-                    if (
+                    if (  ### non-payload fields skips
                         k.startswith('event_')
                         or k.startswith('__')
                         or k not in ('id', 'type', 'occured_at', 'queue')
@@ -49,31 +45,50 @@ class SqlAlchemyOutboxRepository(PaymentEventRepository):
                 },
             }
 
-            await self.session.execute(
-                outbox.insert().values(
-                    id=event_data['id'],
-                    type=event_data['type'],
-                    queue=event_data['queue'],
-                    payload=event_data['payload'],
-                    occured_at=event_data['occured_at'],
-                )
+            stmt = insert(outbox).values(
+                id=event_data['id'],
+                type=event_data['type'],
+                queue=event_data['queue'],
+                payload=event_data['payload'],
+                occured_at=event_data['occured_at'],
+                handled_at=None,
             )
+            await self.session.execute(stmt)
+
+    async def mark_done(self, event_id: UUID) -> None:
+        """
+        Marks task as done
+        """
+        await self.session.execute(
+            update(outbox).where(outbox.c.id == event_id).values(status=TaskStatus.OK)
+        )
+
+    async def mark_failed(self, event_id: UUID) -> None:
+        """
+        Marks task as failed
+        """
+        await self.session.execute(
+            update(outbox).where(outbox.c.id == event_id).values(status=TaskStatus.FAIL)
+        )
 
     async def get_pendings(self, limit: int = 50) -> list[PaymentDomainEvent]:
         """
-        Rebuilds PaymentDomain-based events from outbox table
+        Rebuilds unprocessed PaymentDomain-based events from outbox table
         """
+
         subq = (
             select(outbox.c.id)
             .where(outbox.c.status == TaskStatus.PENDING)
             .limit(limit)
-            .with_for_update(skip_locked=True)
+            .with_for_update(
+                skip_locked=True
+            )  # Lock rows to prevent other processes from picking them up
         )
-
         rows = (await self.session.execute(subq)).scalars().all()
         if not rows:
             return []
 
+        # Set querried tasks as in_process to avoid processing duplicates
         stmt = (
             update(outbox)
             .where(outbox.c.id.in_(rows))
@@ -83,14 +98,39 @@ class SqlAlchemyOutboxRepository(PaymentEventRepository):
         claimed = (await self.session.execute(stmt)).mappings().all()
         return [rebuild_event(row) for row in claimed]
 
-    async def mark_done(self, event_id: UUID) -> None:
-        await self.session.execute(
-            update(outbox)
+    async def mark_in_process(self, event_id: UUID) -> bool:
+        """
+        Retrieve and lock an event for sensetive communication content like
+        external things or client notification
+        should prevent duplicated messages in similar cases.
+
+        If event is not `PENDING`, return None.
+        """
+        now = datetime.now(timezone.utc)
+
+        # Subquery to lock the row if in PENDING state
+        subq = (
+            select(outbox.c.id)
             .where(outbox.c.id == event_id)
-            .values(status=TaskStatus.OK, handled_at=datetime.now(timezone.utc))
+            .where(outbox.c.status == TaskStatus.PENDING)
+            .with_for_update(skip_locked=True)
+            .limit(1)
         )
 
-    async def mark_failed(self, event_id: UUID) -> None:
-        await self.session.execute(
-            update(outbox).where(outbox.c.id == event_id).values(status=TaskStatus.FAIL)
+        # Try to lock the row and retrieve it
+        row = await self.session.execute(subq)
+        row = row.scalars().first()
+
+        if not row:
+            # Either not found or already processed/locked
+            return False
+
+        stmt = (
+            update(outbox)
+            .where(outbox.c.id == event_id)
+            .values(status=TaskStatus.IN_PROCESS, handled_at=now)
         )
+        await self.session.execute(stmt)
+
+        return True
+

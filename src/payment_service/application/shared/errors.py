@@ -16,3 +16,11 @@ class BaseApplicationError(Exception):
     @property
     def detail(self) -> str:
         return 'An application error occurred'
+
+
+class RetryableError(BaseApplicationError):
+    pass
+
+
+class NonRetryableError(BaseApplicationError):
+    pass

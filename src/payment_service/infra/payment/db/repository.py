@@ -20,26 +20,19 @@ from infra.payment.db.table import payments
 
 
 class SqlAlchemyPaymentRepository(PaymentRepository):
+    """
+    PostgreSQL implementation of repo
+    to change DB replace insert postgres dialtect  with complimentary one
+    """
+
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_id(self, payment_id: PaymentId) -> Payment:
-        stmt = select(payments).where(payments.c.id == payment_id.value).with_for_update()
-        result = await self.session.execute(stmt)
-        row = result.mappings().first()
-
-        if not row:
-            raise PaymentResourceNotFoundError(f'Payment not found: {payment_id.value}')
-
-        return self._to_domain(row)
-
-    async def get_by_key(self, key: IdempotencyKey) -> Optional[Payment]:
-        stmt = select(payments).where(payments.c.idempotency_key == key.value).with_for_update()
-        result = await self.session.execute(stmt)
-        row = result.mappings().first()
-        return self._to_domain(row) if row else None
-
     async def save(self, payment: Payment) -> None:
+        """
+        Saves an payment domain aggregate to db
+        """
+
         stmt = insert(payments).values(
             id=payment.id.value,
             amount=payment.amount.value,
@@ -54,6 +47,9 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
         await self.session.execute(stmt)
 
     async def update(self, payment: Payment) -> None:
+        """
+        Updates payment status and timestamp when processed
+        """
         stmt = (
             update(payments)
             .where(payments.c.id == payment.id.value)
@@ -61,7 +57,32 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
         )
         await self.session.execute(stmt)
 
+    async def get_by_id(self, payment_id: PaymentId) -> Payment:
+        """
+        Handles payment by it ID
+        """
+        stmt = select(payments).where(payments.c.id == payment_id.value).with_for_update()
+        result = await self.session.execute(stmt)
+        row = result.mappings().first()
+
+        if not row:
+            raise PaymentResourceNotFoundError(f'Payment not found: {payment_id.value}')
+
+        return self._to_domain(row)
+
+    async def get_by_key(self, key: IdempotencyKey) -> Optional[Payment]:
+        """
+        Handeles payment by uinque Idempotency key
+        """
+        stmt = select(payments).where(payments.c.idempotency_key == key.value).with_for_update()
+        result = await self.session.execute(stmt)
+        row = result.mappings().first()
+        return self._to_domain(row) if row else None
+
     def _to_domain(self, row: RowMapping) -> Payment:
+        """
+        Mapper from DB row to Domain aggregate
+        """
         return Payment.rebuild(
             id=PaymentId.rebuild(row['id']),
             amount=Amount.rebuild(row['amount']),

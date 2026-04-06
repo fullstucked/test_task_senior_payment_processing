@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from application.payment.uow import AbstractPaymentUnitOfWork
+from application.payment.interfaces.uow import AbstractPaymentUnitOfWork
 from infra.payment.db.repository import SqlAlchemyPaymentRepository
 from infra.payment.outbox.repository import SqlAlchemyOutboxRepository
 from infra.shared.session import async_session_factory
@@ -19,12 +19,15 @@ class SqlAlchemyUnitOfWork(AbstractPaymentUnitOfWork):
 
     async def __aexit__(self, exc_type, exc, tb):
         if self.session is None:
-            return  
+            return
         try:
             if exc:
                 await self.rollback()
+            # else:
+            #     await self.commit() ## I prefere explict commit, but possible to toggle by uncommenting and removing others
         finally:
             await self.session.close()
+            self.session = None
 
     async def commit(self) -> None:
         if not self.session:

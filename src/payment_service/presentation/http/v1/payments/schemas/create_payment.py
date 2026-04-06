@@ -1,38 +1,40 @@
-from application.payment.use_cases.create_payment import CreatePaymentDTO
+from domain.payment.enums.currency import Currency
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Dict
 from uuid import UUID
 
+from application.payment.use_cases.create_payment import CreatePaymentDTO
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-
-from domain.payment.enums.currency import Currency
 
 
 class CreatePaymentRequest(BaseModel):
     amount: Decimal = Field(
-        ...,
-        gt=Decimal(0),
-        description='Amount must be greater than 0',
-        json_schema_extra={'example': 123.45},
+        default=...,
+        description='Amount must be greater than 0, max 2 decimal places',
+        json_schema_extra={'example': 123.45},  # <-- Pydantic v2 way
     )
-    currency: Currency = Field(
-        ..., description='Payment currency', json_schema_extra={'example': 'USD'}
-    )
+    currency: Currency = Field(...)
     description: str = Field(
-        ..., description='Payment description', json_schema_extra={'example': 'Invoice 123'}
+        default=...,
+        description=(
+            'Payment description. Must be 10–250 characters. '
+            'Allowed characters: letters, numbers, spaces, .,,-!?'
+        ),
+        json_schema_extra={'example': 'Invoice test_123'},
     )
-    metadata: dict[str, Any] = Field(
+    metadata: Dict[str, Any] = Field(
         default_factory=dict,
-        description='Additional metadata',
+        description='Additional metadata for payment (JSON object)',
         json_schema_extra={'example': {'order_id': 'ABC123'}},
     )
     webhook_url: HttpUrl = Field(
-        ...,
-        description='Webhook callback URL',
+        default=...,
+        description='Webhook callback URL (http or https, cannot point to localhost)',
         json_schema_extra={'example': 'https://example.com/webhook'},
     )
 
+    model_config = ConfigDict(from_attributes=True)
     model_config = ConfigDict(from_attributes=True)
 
     def _to_application_lvl_dto(self, key) -> CreatePaymentDTO:

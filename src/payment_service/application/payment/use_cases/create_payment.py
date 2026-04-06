@@ -4,10 +4,10 @@ from typing import Any, override
 from uuid import UUID
 
 from application.payment.dto.create import PaymentCreateReadDTO
-from application.payment.event_bus import AbstractPaymentEventBus
-from application.payment.uow import AbstractPaymentUnitOfWork
+from application.payment.interfaces.event_bus import AbstractPaymentEventBus
+from application.payment.interfaces.uow import AbstractPaymentUnitOfWork
 from application.shared.dto import BaseDTO
-from application.shared.use_case import UseCaseInterface
+from application.shared.use_cases.use_case import UseCaseInterface
 from domain.payment.enums.currency import Currency
 from domain.payment.service import PaymentService
 from domain.payment.value_objects.amount import Amount
@@ -40,6 +40,7 @@ class CreatePaymentUseCase(UseCaseInterface[CreatePaymentDTO, PaymentCreateReadD
 
     @override
     async def __call__(self, dto: CreatePaymentDTO) -> PaymentCreateReadDTO:
+
         amount = Amount(dto.amount)
         currency = dto.currency
         key = IdempotencyKey(dto.key)
@@ -61,6 +62,9 @@ class CreatePaymentUseCase(UseCaseInterface[CreatePaymentDTO, PaymentCreateReadD
             await uow.outbox.add(events)
             await uow.commit()
 
-        await self._event_bus.publish_payment_event(events)
+        try:
+            await self._event_bus.publish_payment_event(events)
+        except Exception:
+            pass
 
         return PaymentCreateReadDTO.from_domain(payment=payment)

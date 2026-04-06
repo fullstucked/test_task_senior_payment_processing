@@ -1,7 +1,7 @@
 from typing import override
 
-from application.payment.event_bus import AbstractPaymentEventBus
-from application.payment.uow import AbstractPaymentUnitOfWork
+from application.payment.interfaces.event_bus import AbstractPaymentEventBus
+from application.payment.interfaces.uow import AbstractPaymentUnitOfWork
 
 
 class FetchPendingTasks:

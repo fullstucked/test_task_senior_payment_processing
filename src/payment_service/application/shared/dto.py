@@ -1,4 +1,2 @@
-from abc import ABC
-
-
-class BaseDTO(ABC): ...
+class BaseDTO:
+    pass

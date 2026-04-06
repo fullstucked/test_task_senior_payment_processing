@@ -23,6 +23,9 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - pg_volume:/var/lib/postgresql/data #:rw
+      # for DevOps to more explict DB configuration
+      # - ../postgres/postgres.conf:/etc/postgresql/postgresql.conf:ro
+      # - ../postgres/init-scripts:/docker-entrypoint-initdb.d:ro
     command: [ "postgres"] #, "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_statement=none", "-c", "log_min_duration_statement=1000", "-c", "log_connections=on", "-c", "log_disconnections=on" ]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -44,6 +47,7 @@ services:
       RABBITMQ_DEFAULT_PASS: ${BROKER_PASS}
     ports:
       - "${BROKER_PORT}:5672"  # e.g., 5672:5672
+      # - "15672:15672"  # management UI
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
